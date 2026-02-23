@@ -517,3 +517,39 @@ section figure img {
     width: 180px;
   }
 }
+
+
+.person-row{
+  display: flex;
+  gap: 28px;
+  align-items: flex-start;
+  margin-bottom: 36px;
+}
+
+.person-photo{
+  flex-shrink: 0;
+}
+
+.person-photo img{
+  width: 220px;          /* やや大きめで自然 */
+  max-width: 240px;
+  height: auto;          /* ← 重要：縦比率維持 */
+  border-radius: 12px;
+  display: block;
+}
+
+/* Description side */
+.person-info{
+  flex: 1;
+}
+
+/* Responsive */
+@media (max-width: 768px){
+  .person-row{
+    flex-direction: column;
+  }
+
+  .person-photo img{
+    width: 200px;
+  }
+}
