@@ -468,3 +468,52 @@ section figure img {
   font-size: 0.95rem;
   line-height: 1.5;
 }
+
+/* ===== Student row layout ===== */
+
+.person-row{
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  margin-bottom: 32px;
+}
+
+.person-photo img{
+  width: 200px;          /* 適度なサイズ */
+  max-width: 220px;
+  height: auto;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.person-info{
+  flex: 1;
+}
+
+.person-name{
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin-bottom: 6px;
+}
+
+.person-meta{
+  font-size: 0.95rem;
+  opacity: 0.85;
+  margin-bottom: 10px;
+}
+
+.person-desc{
+  margin: 0;
+}
+
+/* ===== Responsive (mobile) ===== */
+
+@media (max-width: 768px){
+  .person-row{
+    flex-direction: column;
+  }
+
+  .person-photo img{
+    width: 180px;
+  }
+}
