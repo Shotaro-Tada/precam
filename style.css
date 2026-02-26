@@ -556,17 +556,31 @@ section figure img {
 
 .news-content {
   display: flex;
-  gap: 20px;
+  gap: 18px;
   align-items: flex-start;
-  margin-top: 15px;
+  margin-top: 12px;
 }
 
 .news-image img {
   width: 180px;
   height: auto;
   border-radius: 6px;
+  display: block;
 }
 
 .news-text {
   flex: 1;
+  min-width: 0; /* 長文でレイアウト崩れ防止 */
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .news-content {
+    flex-direction: column;
+  }
+
+  .news-image img {
+    width: 100%;
+    max-width: 320px;
+  }
 }
