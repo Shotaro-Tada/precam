@@ -320,10 +320,6 @@ details.abs summary:hover{
   border: none;
 }
 
-.muted-image {
-    filter: saturate(70%) contrast(95%) brightness(98%);
-}
-
 /* Research page images */
 section figure {
   margin: 1.5rem 0;
@@ -393,48 +389,6 @@ section figure img {
   opacity: 0.9;
 }
 
-/* ===== News ===== */
-.news-list{
-  display: grid;
-  gap: 14px;
-  margin: 14px 0 26px;
-}
-
-.news-item{
-  border: 1px solid rgba(0,0,0,0.12);
-  border-radius: 12px;
-  padding: 14px 14px 12px;
-  background: #fff;
-}
-
-.news-date{
-  font-size: 0.9rem;
-  opacity: 0.8;
-  margin-bottom: 6px;
-}
-
-.news-title{
-  font-weight: 700;
-  font-size: 1.05rem;
-  margin-bottom: 6px;
-}
-
-.news-meta{
-  font-size: 0.92rem;
-  opacity: 0.85;
-  margin-bottom: 10px;
-}
-
-.news-desc{
-  margin: 0;
-}
-
-.news-link{
-  display: inline-block;
-  margin-top: 10px;
-  font-size: 0.92rem;
-}
-
 /* ===== Facility Cards ===== */
 
 .facility-grid {
@@ -470,19 +424,23 @@ section figure img {
 }
 
 /* ===== Student row layout ===== */
-
 .person-row{
   display: flex;
-  gap: 24px;
+  gap: 28px;
   align-items: flex-start;
-  margin-bottom: 32px;
+  margin-bottom: 36px;
+}
+
+.person-photo{
+  flex-shrink: 0;
 }
 
 .person-photo img{
-  width: 200px;          /* 適度なサイズ */
-  max-width: 220px;
+  width: 220px;
+  max-width: 240px;
   height: auto;
   border-radius: 12px;
+  display: block;
   object-fit: cover;
 }
 
@@ -490,20 +448,9 @@ section figure img {
   flex: 1;
 }
 
-.person-name{
-  font-weight: 700;
-  font-size: 1.1rem;
-  margin-bottom: 6px;
-}
-
-.person-meta{
-  font-size: 0.95rem;
-  opacity: 0.85;
-  margin-bottom: 10px;
-}
-
-.person-desc{
-  margin: 0;
+@media (max-width: 768px){
+  .person-row{ flex-direction: column; }
+  .person-photo img{ width: 200px; }
 }
 
 /* ===== Responsive (mobile) ===== */
@@ -553,35 +500,79 @@ section figure img {
     width: 200px;
   }
 }
-
-.news-content {
-  display: flex;
-  gap: 18px;
-  align-items: flex-start;
-  margin-top: 12px;
+/* ===== News ===== */
+.news-list{
+  display: grid;
+  gap: 14px;
+  margin: 14px 0 26px;
 }
 
-.news-image img {
-  width: 140px;        /* 固定幅を小さめに */
-  max-width: 100%;     /* はみ出し防止 */
+.news-item{
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 12px;
+  padding: 14px 14px 12px;
+  background: #fff;
+}
+
+.news-date{
+  font-size: 0.9rem;
+  opacity: 0.8;
+  margin-bottom: 6px;
+}
+
+.news-title{
+  font-weight: 700;
+  font-size: 1.05rem;
+  margin-bottom: 6px;
+}
+
+.news-meta{
+  font-size: 0.92rem;
+  opacity: 0.85;
+  margin-bottom: 10px;
+}
+
+/* photo | text layout */
+.news-content{
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin-top: 10px;
+}
+
+.news-image{
+  flex: 0 0 120px;
+}
+
+.news-image img{
+  width: 120px;
   height: auto;
-  border-radius: 4px;
+  max-height: 140px;
+  object-fit: cover;
+  border-radius: 6px;
   display: block;
 }
 
-.news-text {
+.news-text{
   flex: 1;
-  min-width: 0; /* 長文でレイアウト崩れ防止 */
+  min-width: 0;
+}
+
+.news-desc{
+  margin: 0 0 10px 0;
+}
+
+.news-desc:last-child{
+  margin-bottom: 0;
 }
 
 /* Mobile */
-@media (max-width: 768px) {
-  .news-content {
-    flex-direction: column;
-  }
-
-  .news-image img {
+@media (max-width: 768px){
+  .news-content{ flex-direction: column; }
+  .news-image{ flex: none; }
+  .news-image img{
     width: 100%;
     max-width: 320px;
+    max-height: none;
   }
 }
