@@ -562,9 +562,10 @@ section figure img {
 }
 
 .news-image img {
-  width: 180px;
+  width: 140px;        /* 固定幅を小さめに */
+  max-width: 100%;     /* はみ出し防止 */
   height: auto;
-  border-radius: 6px;
+  border-radius: 4px;
   display: block;
 }
 
