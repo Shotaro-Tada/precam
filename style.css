@@ -553,3 +553,20 @@ section figure img {
     width: 200px;
   }
 }
+
+.news-content {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  margin-top: 15px;
+}
+
+.news-image img {
+  width: 180px;
+  height: auto;
+  border-radius: 6px;
+}
+
+.news-text {
+  flex: 1;
+}
