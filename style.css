@@ -559,16 +559,17 @@ section figure img {
 }
 
 .news-image{
-  flex: 0 0 120px;
+  flex: 0 0 160px;
 }
 
 .news-image img{
-  width: 120px;
+  width: 160px;
   height: auto;
-  max-height: 140px;
+  max-height: 200px;
   object-fit: cover;
   border-radius: 6px;
   display: block;
+  image-rendering: auto;
 }
 
 .news-text{
