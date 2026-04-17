@@ -54,6 +54,7 @@ a:hover{
 
 .site-logo img{
   height: 64px;
+  max-width: 260px;
   width: auto;
   display: block;
 }
