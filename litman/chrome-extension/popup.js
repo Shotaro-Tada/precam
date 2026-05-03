@@ -256,8 +256,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const library = $("#library-select").value;
     const folder = $("#folder-input").value.trim() || "General";
-    const key = paperData ? generateBibtexKey(paperData) : "paper";
-    const filename = `${key}.pdf`;
+    let filename = "paper.pdf";
+    if (paperData) {
+      const family = (paperData.authors[0]?.family || "unknown").replace(/[^a-zA-Z0-9]/g, "");
+      const year = paperData.year || "";
+      const title = (paperData.title || "").replace(/:/g, "_").replace(/[<>"/\\|?*]/g, "").trim();
+      filename = `${family}-${year}-${title}.pdf`;
+    }
 
     chrome.downloads.download(
       { url: pdfUrl, filename, saveAs: true },
