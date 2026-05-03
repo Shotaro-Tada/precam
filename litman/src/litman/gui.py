@@ -428,6 +428,13 @@ if _sync_btn:
                         cwd=_lib_str, capture_output=True, text=True,
                     )
                     if _merge.returncode != 0:
+                        subprocess.run(["git", "merge", "--abort"], cwd=_lib_str, capture_output=True)
+                        _merge = subprocess.run(
+                            ["git", "merge", "origin/main", "--allow-unrelated-histories",
+                             "-X", "theirs", "-m", "litman: pull from shared library"],
+                            cwd=_lib_str, capture_output=True, text=True,
+                        )
+                    if _merge.returncode != 0:
                         st.sidebar.error(f"Merge failed: {_merge.stderr[:120]}")
                         _pull_ok = False
 
@@ -1031,7 +1038,17 @@ elif page == "Sync":
                             st.cache_data.clear()
                             st.success(f"Pull complete! ({len(changes)} file changes)")
                         else:
-                            st.error(f"Merge failed: {merge_r.stderr}")
+                            subprocess.run(["git", "merge", "--abort"], cwd=lib_str, capture_output=True)
+                            merge_r2 = subprocess.run(
+                                ["git", "merge", "origin/main", "--allow-unrelated-histories",
+                                 "-X", "theirs", "-m", "litman: pull from shared library"],
+                                cwd=lib_str, capture_output=True, text=True,
+                            )
+                            if merge_r2.returncode == 0:
+                                st.cache_data.clear()
+                                st.success(f"Pull complete! ({len(changes)} file changes)")
+                            else:
+                                st.error(f"Merge failed: {merge_r2.stderr}")
             except subprocess.CalledProcessError as e:
                 st.error(f"Git error: {e.stderr.decode() if e.stderr else e}")
 
@@ -1051,7 +1068,17 @@ elif page == "Sync":
                         st.cache_data.clear()
                         st.success("Pull complete!")
                     else:
-                        st.error(f"Merge failed: {merge_r.stderr}")
+                        subprocess.run(["git", "merge", "--abort"], cwd=lib_str, capture_output=True)
+                        merge_r2 = subprocess.run(
+                            ["git", "merge", "origin/main", "--allow-unrelated-histories",
+                             "-X", "theirs", "-m", "litman: pull from shared library"],
+                            cwd=lib_str, capture_output=True, text=True,
+                        )
+                        if merge_r2.returncode == 0:
+                            st.cache_data.clear()
+                            st.success("Pull complete!")
+                        else:
+                            st.error(f"Merge failed: {merge_r2.stderr}")
                     st.rerun()
                 except subprocess.CalledProcessError as e:
                     st.error(f"Git error: {e.stderr.decode() if e.stderr else e}")
