@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.venv/
+.env
+.pytest_cache/
+
+# Library data (managed locally, not in source control)
+library/
+*.sqlite
+*.bib
+*.csv
