@@ -1102,35 +1102,6 @@ elif page == "Export":
                 st.session_state.pop("sync_push_warn", None)
                 st.rerun()
 
-    with st.expander("Setup guide"):
-        st.markdown("""
-**1. Create a shared private repository**
-- Go to [github.com/new](https://github.com/new)
-- Name: e.g. `precam-litman-library`
-- **Visibility: Private**
-- Do **not** initialize with README
-
-**2. Add collaborators**
-- Settings → Collaborators → Add members with **Write** access
-
-**3. Authenticate (choose one)**
-
-**GitHub CLI (recommended)**
-```bash
-gh auth login
-```
-
-**SSH key**
-```bash
-ssh-keygen -t ed25519
-# Add public key to GitHub → Settings → SSH keys
-```
-
-**HTTPS (token)**
-```bash
-git config --global credential.helper manager
-```
-""")
 
     # ── Library Stats ─────────────────────────────────────────────────────
     st.markdown("---")
