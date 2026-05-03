@@ -121,20 +121,37 @@ async function fetchAndDisplay(doi) {
 
 document.addEventListener("DOMContentLoaded", async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const tabUrl = tab?.url || "";
+
+  const isDirectPdf = /\.pdf(\?|$|#)/i.test(tabUrl) || tab?.title?.endsWith(".pdf");
+
+  if (isDirectPdf) {
+    pdfUrl = tabUrl;
+  }
 
   try {
     const detection = await chrome.tabs.sendMessage(tab.id, { type: "DETECT" });
-    if (detection?.pdfUrl) pdfUrl = detection.pdfUrl;
+    if (detection?.pdfUrl && !isDirectPdf) pdfUrl = detection.pdfUrl;
 
     if (detection?.doi) {
       await fetchAndDisplay(detection.doi);
     } else {
+      const doiFromUrl = tabUrl.match(/doi\.org\/(10\.\d{4,}\/[^\s&?#]+)/);
+      if (doiFromUrl) {
+        await fetchAndDisplay(doiFromUrl[1]);
+      } else {
+        $("#loading").hidden = true;
+        $("#no-doi").hidden = false;
+      }
+    }
+  } catch {
+    const doiFromUrl = tabUrl.match(/doi\.org\/(10\.\d{4,}\/[^\s&?#]+)/);
+    if (doiFromUrl) {
+      await fetchAndDisplay(doiFromUrl[1]);
+    } else {
       $("#loading").hidden = true;
       $("#no-doi").hidden = false;
     }
-  } catch {
-    $("#loading").hidden = true;
-    $("#no-doi").hidden = false;
   }
 
   $("#save-pdf").disabled = !pdfUrl;

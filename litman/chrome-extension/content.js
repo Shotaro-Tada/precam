@@ -33,17 +33,31 @@
   }
 
   function detectPDFUrl() {
+    if (/\.pdf(\?|$|#)/i.test(window.location.href)) {
+      return window.location.href;
+    }
+
     const meta = document.querySelector('meta[name="citation_pdf_url"]');
-    if (meta) return meta.getAttribute("content");
+    if (meta) {
+      const url = meta.getAttribute("content");
+      if (url) {
+        try { return new URL(url, window.location.origin).href; } catch { /* skip */ }
+      }
+    }
 
     const links = document.querySelectorAll('a[href]');
     for (const a of links) {
       const href = a.getAttribute("href") || "";
-      const text = (a.textContent || "").toLowerCase();
-      if (href.match(/\.pdf(\?|$|#)/i) || text.includes("pdf")) {
-        try {
-          return new URL(href, window.location.origin).href;
-        } catch { /* skip */ }
+      if (/\.pdf(\?|$|#)/i.test(href)) {
+        try { return new URL(href, window.location.origin).href; } catch { /* skip */ }
+      }
+    }
+
+    for (const a of links) {
+      const href = a.getAttribute("href") || "";
+      const text = (a.textContent || "").trim().toLowerCase();
+      if ((text === "pdf" || text === "download pdf") && href && !href.startsWith("javascript:")) {
+        try { return new URL(href, window.location.origin).href; } catch { /* skip */ }
       }
     }
     return null;
