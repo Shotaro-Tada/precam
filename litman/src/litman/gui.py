@@ -372,7 +372,7 @@ def get_filtered_papers() -> list[Paper]:
 if _sync_btn:
     import subprocess
     _sync_config = load_config(LIB)
-    _sync_repo = _sync_config.get("library_repo", "")
+    _sync_repo = _sync_config.get("library_repo", "") or "https://github.com/Shotaro-Tada/precam-litman-library.git"
     if not _sync_repo:
         st.sidebar.error("Set repository URL in Export → Sync Settings first.")
     else:
@@ -922,15 +922,17 @@ elif page == "Export":
     st.markdown("---")
     st.subheader("Sync Settings")
 
+    _DEFAULT_REPO = "https://github.com/Shotaro-Tada/precam-litman-library.git"
+
     config = load_config(LIB)
-    library_repo = config.get("library_repo", "")
+    library_repo = config.get("library_repo", "") or _DEFAULT_REPO
 
     sync_repo = st.text_input(
         "Shared library repository",
         value=library_repo,
-        placeholder="https://github.com/Shotaro-Tada/precam-litman-library.git",
         key="sync_repo_url",
     )
+    st.caption("Change this URL to build a library on your own GitHub.")
 
     if sync_repo != library_repo:
         if st.button("Save", key="sync_save"):
