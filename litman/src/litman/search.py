@@ -36,9 +36,9 @@ def filter_papers(
 ) -> list[Paper]:
     result = papers
     if year_from is not None:
-        result = [p for p in result if p.year and p.year >= year_from]
+        result = [p for p in result if not p.year or p.year >= year_from]
     if year_to is not None:
-        result = [p for p in result if p.year and p.year <= year_to]
+        result = [p for p in result if not p.year or p.year <= year_to]
     if tags:
         tag_set = {t.lower() for t in tags}
         result = [p for p in result if tag_set & {t.lower() for t in p.tags}]
