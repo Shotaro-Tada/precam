@@ -207,7 +207,7 @@ with _sync_col:
     _sync_btn = st.button("Sync", key="sidebar_sync_btn", help="Pull → Push with shared library")
 st.sidebar.caption("Lightweight Literature Manager")
 
-page = st.sidebar.radio("", ["Library", "Add Paper", "Import", "Export"], label_visibility="collapsed")
+page = st.sidebar.radio("", ["Library", "Add Paper", "Import", "Export", "Sync"], label_visibility="collapsed")
 
 st.sidebar.markdown("---")
 
@@ -918,9 +918,28 @@ elif page == "Export":
             with st.expander("Preview"):
                 st.code(bib_text, language="bibtex")
 
-    # ── Sync Settings ────────────────────────────────────────────────────
+    # ── Library Stats ─────────────────────────────────────────────────────
     st.markdown("---")
-    st.subheader("Sync Settings")
+    st.subheader("Library Stats")
+    if all_papers:
+        stat_cols = st.columns(4)
+        stat_cols[0].metric("Total Papers", len(all_papers))
+        stat_cols[1].metric("With DOI", sum(1 for p in all_papers if p.doi))
+        stat_cols[2].metric("Members", len(members))
+        stat_cols[3].metric("Folders", len(folder_counts))
+
+        if years:
+            import pandas as pd
+            year_counts = pd.Series(years).value_counts().sort_index()
+            st.bar_chart(year_counts, x_label="Year", y_label="Papers")
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# ── Sync Page ────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════
+
+elif page == "Sync":
+    st.header("Sync")
 
     _DEFAULT_REPO = "https://github.com/Shotaro-Tada/precam-litman-library.git"
 
@@ -976,6 +995,7 @@ elif page == "Export":
 
         _DEL_THRESHOLD = 10
 
+        st.markdown("---")
         sc1, sc2 = st.columns(2)
         with sc1:
             pull_btn = st.button("Pull from GitHub", key="sync_pull", use_container_width=True, type="primary")
@@ -1103,19 +1123,3 @@ elif page == "Export":
                 subprocess.run(["git", "reset", "HEAD"], cwd=lib_str, capture_output=True)
                 st.session_state.pop("sync_push_warn", None)
                 st.rerun()
-
-
-    # ── Library Stats ─────────────────────────────────────────────────────
-    st.markdown("---")
-    st.subheader("Library Stats")
-    if all_papers:
-        stat_cols = st.columns(4)
-        stat_cols[0].metric("Total Papers", len(all_papers))
-        stat_cols[1].metric("With DOI", sum(1 for p in all_papers if p.doi))
-        stat_cols[2].metric("Members", len(members))
-        stat_cols[3].metric("Folders", len(folder_counts))
-
-        if years:
-            import pandas as pd
-            year_counts = pd.Series(years).value_counts().sort_index()
-            st.bar_chart(year_counts, x_label="Year", y_label="Papers")
