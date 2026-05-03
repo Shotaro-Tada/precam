@@ -63,17 +63,17 @@
       return window.location.href;
     }
 
-    const meta = document.querySelector('meta[name="citation_pdf_url"]');
-    if (meta) {
-      const url = meta.getAttribute("content");
-      if (url) {
-        try { return new URL(url, window.location.origin).href; } catch { /* skip */ }
-      }
-    }
-
     const doi = detectDOI();
     const pubUrl = buildPublisherPdfUrl(doi);
     if (pubUrl) return pubUrl;
+
+    const meta = document.querySelector('meta[name="citation_pdf_url"]');
+    if (meta) {
+      const url = meta.getAttribute("content");
+      if (url && /\.pdf(\?|$|#)/i.test(url)) {
+        try { return new URL(url, window.location.origin).href; } catch { /* skip */ }
+      }
+    }
 
     const links = document.querySelectorAll('a[href]');
     for (const a of links) {
