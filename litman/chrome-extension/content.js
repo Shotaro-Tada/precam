@@ -36,7 +36,13 @@
     const host = window.location.hostname;
     const path = window.location.pathname;
 
-    if (host.includes("sciencedirect.com")) {
+    if (host.includes("sciencedirect.com") || host.includes("elsevier.com")) {
+      for (const a of document.querySelectorAll('a[href*="pdfft"], a[href*="/pdf"]')) {
+        const href = a.getAttribute("href") || "";
+        if (/pdfft|\/pdf\?/.test(href)) {
+          try { return new URL(href, window.location.origin).href; } catch { /* skip */ }
+        }
+      }
       const piiMatch = path.match(/\/pii\/([A-Z0-9]+)/i);
       if (piiMatch) return `https://www.sciencedirect.com/science/article/pii/${piiMatch[1]}/pdfft?download=true`;
     }
