@@ -33,9 +33,14 @@
   }
 
   function buildPublisherPdfUrl(doi) {
-    if (!doi) return null;
     const host = window.location.hostname;
+    const path = window.location.pathname;
 
+    if (host.includes("sciencedirect.com")) {
+      const piiMatch = path.match(/\/pii\/([A-Z0-9]+)/i);
+      if (piiMatch) return `https://www.sciencedirect.com/science/article/pii/${piiMatch[1]}/pdfft?download=true`;
+    }
+    if (!doi) return null;
     if (host.includes("wiley.com")) {
       return `https://${host}/doi/pdfdirect/${doi}?download=true`;
     }
