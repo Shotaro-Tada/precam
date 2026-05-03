@@ -825,106 +825,218 @@ elif page == "Export":
             with st.expander("Preview"):
                 st.code(bib_text, language="bibtex")
 
-    # ── Export to GitHub ──────────────────────────────────────────────────
+    # ── Library Sync ────────────────────────────────────────────────────
     st.markdown("---")
-    st.subheader("Export to your GitHub")
+    st.subheader("Library Sync")
 
     config = load_config(LIB)
-    github_repos = config.get("github_repos", {})
+    library_repo = config.get("library_repo", "")
 
-    gh_member = st.selectbox(
-        "Member", members, key="gh_member"
-    ) if members else None
-
-    current_repo = github_repos.get(gh_member, "") if gh_member else ""
-    gh_repo = st.text_input(
-        "GitHub repository URL",
-        value=current_repo,
-        placeholder="https://github.com/username/litman-library.git",
-        key="gh_repo_url",
+    sync_repo = st.text_input(
+        "Shared library repository",
+        value=library_repo,
+        placeholder="https://github.com/Shotaro-Tada/precam-litman-library.git",
+        key="sync_repo_url",
     )
 
-    if gh_member and gh_repo != current_repo:
-        if st.button("Save repository URL", key="gh_save_repo"):
+    if sync_repo != library_repo:
+        if st.button("Save", key="sync_save"):
             config = load_config(LIB)
-            config.setdefault("github_repos", {})[gh_member] = gh_repo
+            config["library_repo"] = sync_repo
             save_config(config, LIB)
-            st.success(f"Saved: {gh_member} → {gh_repo}")
+            st.success("Saved!")
+            st.rerun()
 
-    if gh_member and gh_repo:
-        if st.button("Push to GitHub", key="gh_push", type="primary"):
-            import subprocess
-            lib_str = str(LIB)
+    if library_repo:
+        import subprocess
+        lib_str = str(LIB)
+
+        def _init_lib_git():
+            gi = LIB / ".gitignore"
+            if not gi.exists():
+                gi.write_text(
+                    "*.token\n*.key\n.env\n__pycache__/\n"
+                    ".DS_Store\nThumbs.db\nlibrary.bib\n",
+                    encoding="utf-8",
+                )
+            if not (LIB / ".git").exists():
+                subprocess.run(["git", "init"], cwd=lib_str, check=True, capture_output=True)
+                subprocess.run(["git", "branch", "-M", "main"], cwd=lib_str, check=True, capture_output=True)
+            r = subprocess.run(["git", "remote", "get-url", "origin"], cwd=lib_str, capture_output=True, text=True)
+            if r.returncode != 0:
+                subprocess.run(["git", "remote", "add", "origin", library_repo], cwd=lib_str, check=True, capture_output=True)
+            elif r.stdout.strip() != library_repo:
+                subprocess.run(["git", "remote", "set-url", "origin", library_repo], cwd=lib_str, check=True, capture_output=True)
+
+        def _has_head():
+            return subprocess.run(["git", "rev-parse", "HEAD"], cwd=lib_str, capture_output=True).returncode == 0
+
+        def _commit_local(msg="litman: local snapshot"):
+            subprocess.run(["git", "add", "-A"], cwd=lib_str, check=True, capture_output=True)
+            if _has_head():
+                if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=lib_str, capture_output=True).returncode != 0:
+                    subprocess.run(["git", "commit", "-m", msg], cwd=lib_str, check=True, capture_output=True)
+            else:
+                subprocess.run(["git", "commit", "-m", msg], cwd=lib_str, check=True, capture_output=True)
+
+        _DEL_THRESHOLD = 10
+
+        sc1, sc2 = st.columns(2)
+        with sc1:
+            pull_btn = st.button("Pull from GitHub", key="sync_pull", use_container_width=True, type="primary")
+        with sc2:
+            push_btn = st.button("Push to GitHub", key="sync_push", use_container_width=True, type="primary")
+
+        # ── Pull ─────────────────────────────────────────
+        if pull_btn:
             try:
-                # init if needed
-                if not (LIB / ".git").exists():
-                    subprocess.run(["git", "init"], cwd=lib_str, check=True, capture_output=True)
-                    subprocess.run(["git", "branch", "-M", "main"], cwd=lib_str, check=True, capture_output=True)
-
-                # set remote
-                result = subprocess.run(
-                    ["git", "remote", "get-url", "origin"],
-                    cwd=lib_str, capture_output=True, text=True,
-                )
-                if result.returncode != 0:
-                    subprocess.run(["git", "remote", "add", "origin", gh_repo], cwd=lib_str, check=True, capture_output=True)
-                elif result.stdout.strip() != gh_repo:
-                    subprocess.run(["git", "remote", "set-url", "origin", gh_repo], cwd=lib_str, check=True, capture_output=True)
-
-                # stage, commit, push
-                subprocess.run(["git", "add", "-A"], cwd=lib_str, check=True, capture_output=True)
-                diff = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=lib_str, capture_output=True)
-                if diff.returncode != 0:
-                    subprocess.run(
-                        ["git", "commit", "-m", f"litman: update library ({gh_member})"],
-                        cwd=lib_str, check=True, capture_output=True,
-                    )
-                push = subprocess.run(
-                    ["git", "push", "-u", "origin", "main"],
-                    cwd=lib_str, capture_output=True, text=True,
-                )
-                if push.returncode == 0:
-                    st.success("Pushed to GitHub!")
+                _init_lib_git()
+                _commit_local("litman: snapshot before pull")
+                fetch_r = subprocess.run(["git", "fetch", "origin", "main"], cwd=lib_str, capture_output=True, text=True)
+                if fetch_r.returncode != 0:
+                    st.error(f"Fetch failed: {fetch_r.stderr}")
+                elif subprocess.run(["git", "rev-parse", "--verify", "origin/main"], cwd=lib_str, capture_output=True).returncode != 0:
+                    st.info("Remote is empty. Nothing to pull.")
                 else:
-                    st.error(f"Push failed:\n{push.stderr}")
+                    diff_r = subprocess.run(
+                        ["git", "diff", "--name-status", "HEAD", "origin/main"],
+                        cwd=lib_str, capture_output=True, text=True,
+                    )
+                    changes = [l for l in diff_r.stdout.strip().splitlines() if l]
+                    deletions = [l for l in changes if l.startswith("D")]
+                    if len(deletions) > _DEL_THRESHOLD:
+                        st.session_state["sync_pull_warn"] = len(deletions)
+                    else:
+                        merge_r = subprocess.run(
+                            ["git", "merge", "origin/main", "--allow-unrelated-histories",
+                             "-m", "litman: pull from shared library"],
+                            cwd=lib_str, capture_output=True, text=True,
+                        )
+                        if merge_r.returncode == 0:
+                            st.cache_data.clear()
+                            st.success(f"Pull complete! ({len(changes)} file changes)")
+                        else:
+                            st.error(f"Merge failed: {merge_r.stderr}")
             except subprocess.CalledProcessError as e:
                 st.error(f"Git error: {e.stderr.decode() if e.stderr else e}")
 
-    with st.expander("Setup guide & security"):
+        if st.session_state.get("sync_pull_warn"):
+            n = st.session_state["sync_pull_warn"]
+            st.warning(f"{n} files will be removed from your local library. Proceed?")
+            pc1, pc2 = st.columns(2)
+            if pc1.button("Yes, pull", key="sync_pull_yes", type="primary"):
+                try:
+                    merge_r = subprocess.run(
+                        ["git", "merge", "origin/main", "--allow-unrelated-histories",
+                         "-m", "litman: pull from shared library"],
+                        cwd=lib_str, capture_output=True, text=True,
+                    )
+                    st.session_state.pop("sync_pull_warn", None)
+                    if merge_r.returncode == 0:
+                        st.cache_data.clear()
+                        st.success("Pull complete!")
+                    else:
+                        st.error(f"Merge failed: {merge_r.stderr}")
+                    st.rerun()
+                except subprocess.CalledProcessError as e:
+                    st.error(f"Git error: {e.stderr.decode() if e.stderr else e}")
+            if pc2.button("Cancel", key="sync_pull_no"):
+                st.session_state.pop("sync_pull_warn", None)
+                st.rerun()
+
+        # ── Push ─────────────────────────────────────────
+        if push_btn:
+            try:
+                _init_lib_git()
+                subprocess.run(["git", "add", "-A"], cwd=lib_str, check=True, capture_output=True)
+                has_head = _has_head()
+                no_changes = has_head and subprocess.run(
+                    ["git", "diff", "--cached", "--quiet"], cwd=lib_str, capture_output=True,
+                ).returncode == 0
+                if no_changes:
+                    st.info("No local changes to push.")
+                else:
+                    diff_r = subprocess.run(
+                        ["git", "diff", "--cached", "--name-status"],
+                        cwd=lib_str, capture_output=True, text=True,
+                    )
+                    changes = [l for l in diff_r.stdout.strip().splitlines() if l]
+                    deletions = [l for l in changes if l.startswith("D")]
+                    if len(deletions) > _DEL_THRESHOLD:
+                        st.session_state["sync_push_warn"] = len(deletions)
+                    else:
+                        subprocess.run(
+                            ["git", "commit", "-m", "litman: sync library"],
+                            cwd=lib_str, check=True, capture_output=True,
+                        )
+                        push_r = subprocess.run(
+                            ["git", "push", "-u", "origin", "main"],
+                            cwd=lib_str, capture_output=True, text=True,
+                        )
+                        if push_r.returncode == 0:
+                            st.success(f"Pushed! ({len(changes)} file changes)")
+                        elif "rejected" in push_r.stderr:
+                            st.error("Push rejected — pull first to sync with remote.")
+                        else:
+                            st.error(f"Push failed: {push_r.stderr}")
+            except subprocess.CalledProcessError as e:
+                st.error(f"Git error: {e.stderr.decode() if e.stderr else e}")
+
+        if st.session_state.get("sync_push_warn"):
+            n = st.session_state["sync_push_warn"]
+            st.warning(f"{n} files will be deleted from the shared library. Proceed?")
+            pc1, pc2 = st.columns(2)
+            if pc1.button("Yes, push", key="sync_push_yes", type="primary"):
+                try:
+                    subprocess.run(
+                        ["git", "commit", "-m", "litman: sync library"],
+                        cwd=lib_str, check=True, capture_output=True,
+                    )
+                    push_r = subprocess.run(
+                        ["git", "push", "-u", "origin", "main"],
+                        cwd=lib_str, capture_output=True, text=True,
+                    )
+                    st.session_state.pop("sync_push_warn", None)
+                    if push_r.returncode == 0:
+                        st.success("Pushed!")
+                    else:
+                        st.error(f"Push failed: {push_r.stderr}")
+                    st.rerun()
+                except subprocess.CalledProcessError as e:
+                    st.error(f"Git error: {e.stderr.decode() if e.stderr else e}")
+            if pc2.button("Cancel", key="sync_push_no"):
+                subprocess.run(["git", "reset", "HEAD"], cwd=lib_str, capture_output=True)
+                st.session_state.pop("sync_push_warn", None)
+                st.rerun()
+
+    with st.expander("Setup guide"):
         st.markdown("""
-**1. Create a private repository**
+**1. Create a shared private repository**
 - Go to [github.com/new](https://github.com/new)
-- Repository name: e.g. `litman-library`
-- **Visibility: Private** (important!)
+- Name: e.g. `precam-litman-library`
+- **Visibility: Private**
 - Do **not** initialize with README
 
-**2. Authenticate (choose one)**
+**2. Add collaborators**
+- Settings → Collaborators → Add members with **Write** access
 
-**Option A: GitHub CLI (recommended)**
+**3. Authenticate (choose one)**
+
+**GitHub CLI (recommended)**
 ```bash
 gh auth login
 ```
 
-**Option B: SSH key**
+**SSH key**
 ```bash
 ssh-keygen -t ed25519
-# Add ~/.ssh/id_ed25519.pub to GitHub → Settings → SSH keys
-# Use SSH URL: git@github.com:username/litman-library.git
+# Add public key to GitHub → Settings → SSH keys
 ```
 
-**Option C: Personal Access Token (HTTPS)**
+**HTTPS (token)**
 ```bash
 git config --global credential.helper manager
-# Git will prompt for token on first push
 ```
-
-**3. Security best practices**
-- Always use **Private** repositories — public repos expose your library to anyone
-- **Never** commit tokens or passwords into files
-- Use **Collaborators** (Settings → Collaborators) to share with specific lab members only
-- Enable **branch protection** on `main` to prevent accidental force-pushes
-- Review `Settings → Actions → General` and disable Actions if not needed
-- For group sharing: one member creates the repo, others are added as collaborators with **Write** access
 """)
 
     # ── Library Stats ─────────────────────────────────────────────────────
