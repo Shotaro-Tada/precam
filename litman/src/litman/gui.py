@@ -19,7 +19,7 @@ from litman.citation import (
     render_custom_style_html,
 )
 from litman.fetchers import fetch_metadata
-from litman.fetchers.crossref import fetch_by_doi
+from litman.fetchers.crossref import fetch_by_doi, search_doi_by_title
 from litman.models import Paper
 from litman.search import filter_papers, search_papers
 from litman.store import (
@@ -39,6 +39,9 @@ from litman.store import (
     save_custom_style,
     save_paper,
 )
+
+from litman.api_server import start_api_server
+start_api_server()
 
 st.set_page_config(page_title="litman", page_icon="📚", layout="wide")
 
@@ -213,12 +216,21 @@ st.sidebar.markdown("---")
 
 # ── Member selector (pulldown) ───────────────────────────────────────────
 
+_ui_config = load_config(LIB)
+_last_member = _ui_config.get("last_member")
+_last_folder = _ui_config.get("last_folder")
+
 member_options = ["All Members"] + members
+_mem_idx = 0
+if _last_member and _last_member in member_options and "sidebar_member" not in st.session_state:
+    _mem_idx = member_options.index(_last_member)
+
 sb_col1, sb_col2 = st.sidebar.columns([4, 1])
 with sb_col1:
     selected_member = st.selectbox(
         "Member",
         member_options,
+        index=_mem_idx,
         key="sidebar_member",
     )
 with sb_col2:
@@ -257,12 +269,22 @@ else:
 folder_keys = [k for k, _ in folder_opts]
 folder_labels = {k: v for k, v in folder_opts}
 
+_fld_idx = 0
+if _last_folder and _last_folder in folder_keys and "sidebar_folder" not in st.session_state:
+    _fld_idx = folder_keys.index(_last_folder)
+
 selected_folder = st.sidebar.selectbox(
     "Folder",
     folder_keys,
+    index=_fld_idx,
     format_func=lambda k: folder_labels[k],
     key="sidebar_folder",
 )
+
+if selected_member != _last_member or selected_folder != _last_folder:
+    _ui_config["last_member"] = selected_member
+    _ui_config["last_folder"] = selected_folder
+    save_config(_ui_config, LIB)
 
 # ── Filters ──────────────────────────────────────────────────────────────
 
@@ -278,6 +300,8 @@ if years:
         year_range = st.sidebar.slider("Year", min_y, max_y, (min_y, max_y))
 
 selected_journal = st.sidebar.selectbox("Journal", ["All"] + all_journals) if all_journals else "All"
+
+sort_order = st.sidebar.selectbox("Sort by", ["Recently added", "Recently modified", "Title (A→Z)", "Year (newest)"], key="sort_order")
 
 # ── Citation Style selector ─────────────────────────────────────────────
 
@@ -363,7 +387,14 @@ def get_filtered_papers() -> list[Paper]:
         papers = filter_papers(papers, year_from=year_range[0], year_to=year_range[1])
     if selected_journal and selected_journal != "All":
         papers = filter_papers(papers, journal=selected_journal)
-    papers.sort(key=lambda p: p.added_at, reverse=True)
+    if sort_order == "Recently modified":
+        papers.sort(key=lambda p: p.updated_at, reverse=True)
+    elif sort_order == "Title (A→Z)":
+        papers.sort(key=lambda p: p.title.lower())
+    elif sort_order == "Year (newest)":
+        papers.sort(key=lambda p: (p.year or 0), reverse=True)
+    else:
+        papers.sort(key=lambda p: p.added_at, reverse=True)
     return papers
 
 
@@ -499,7 +530,6 @@ if page == "Library":
                         type="primary" if is_sel else "secondary",
                     ):
                         st.session_state.selected_paper = p.id
-                        st.rerun()
 
         with col_detail:
           with st.container(height=700):
@@ -525,6 +555,33 @@ if page == "Library":
                         f"**DOI:** {paper.doi or 'N/A'}"
                     )
 
+                    if not paper.doi and paper.title and paper.title != "Untitled":
+                        if st.button("Find DOI from title", key=f"find_doi_{paper.id}"):
+                            st.session_state[f"doi_search_{paper.id}"] = True
+                        if st.session_state.get(f"doi_search_{paper.id}"):
+                            with st.spinner("Searching CrossRef..."):
+                                try:
+                                    candidates = search_doi_by_title(paper.title)
+                                except Exception as e:
+                                    candidates = []
+                                    st.error(f"Search failed: {e}")
+                            if candidates:
+                                for i, c in enumerate(candidates):
+                                    auth_str = ", ".join(c["authors"][:2])
+                                    if len(c["authors"]) > 2:
+                                        auth_str += " et al."
+                                    st.caption(f"{c['title'][:80]}  \n{auth_str} · {c['year'] or '?'} · {c['journal'] or ''}")
+                                    if st.button(f"Use {c['doi']}", key=f"use_doi_{paper.id}_{i}"):
+                                        paper.doi = c["doi"]
+                                        paper.url = f"https://doi.org/{c['doi']}"
+                                        paper.updated_at = datetime.now().isoformat(timespec="seconds")
+                                        save_paper(paper, LIB)
+                                        st.session_state.pop(f"doi_search_{paper.id}", None)
+                                        st.cache_data.clear()
+                                        st.rerun()
+                            else:
+                                st.info("No results found.")
+
                     folders = [t[7:] for t in paper.tags if t.startswith("folder:")]
                     if folders:
                         st.markdown("**Folders:** " + "  ".join(f"`{f}`" for f in folders))
@@ -546,13 +603,22 @@ if page == "Library":
                         or not paper.publisher
                         or paper.title == "Untitled"
                     )
-                    if paper.doi and _missing:
+                    if _missing:
                       with st.container():
+                        _doi_to_use = paper.doi
+                        if not paper.doi:
+                            _doi_to_use = st.text_input(
+                                "Enter DOI to fetch metadata",
+                                key=f"doi_input_{paper.id}",
+                                placeholder="10.xxxx/xxxxx",
+                            )
                         st.markdown('<div class="fix-doi-blink">', unsafe_allow_html=True)
-                        if st.button("Fix information from DOI", key=f"fix_{paper.id}"):
+                        if st.button("Fix information from DOI", key=f"fix_{paper.id}", disabled=not _doi_to_use):
                             with st.spinner("Fetching from CrossRef..."):
                                 try:
-                                    fresh = fetch_by_doi(paper.doi, paper.url or "")
+                                    fresh = fetch_by_doi(_doi_to_use, paper.url or "")
+                                    if not paper.doi:
+                                        paper.doi = fresh.doi or _doi_to_use
                                     if not paper.year and fresh.year:
                                         paper.year = fresh.year
                                     if not paper.authors and fresh.authors:
@@ -573,6 +639,8 @@ if page == "Library":
                                         paper.publisher = fresh.publisher
                                     if paper.title == "Untitled" and fresh.title != "Untitled":
                                         paper.title = fresh.title
+                                    if not paper.url and fresh.doi:
+                                        paper.url = f"https://doi.org/{fresh.doi}"
                                     paper.updated_at = datetime.now().isoformat(timespec="seconds")
                                     save_paper(paper, LIB)
                                     st.cache_data.clear()
