@@ -199,7 +199,12 @@ years = [p.year for p in all_papers if p.year]
 
 # ── Sidebar ──────────────────────────────────────────────────────────────
 
-st.sidebar.title("litman")
+_title_col, _sync_col = st.sidebar.columns([3, 1])
+with _title_col:
+    st.title("litman")
+with _sync_col:
+    st.markdown("<br>", unsafe_allow_html=True)
+    _sync_btn = st.button("Sync", key="sidebar_sync_btn", help="Pull → Push with shared library")
 st.sidebar.caption("Lightweight Literature Manager")
 
 page = st.sidebar.radio("", ["Library", "Add Paper", "Import", "Export"], label_visibility="collapsed")
@@ -360,6 +365,94 @@ def get_filtered_papers() -> list[Paper]:
         papers = filter_papers(papers, journal=selected_journal)
     papers.sort(key=lambda p: p.added_at, reverse=True)
     return papers
+
+
+# ── Sidebar Sync (Pull → Push) ──────────────────────────────────────────
+
+if _sync_btn:
+    import subprocess
+    _sync_config = load_config(LIB)
+    _sync_repo = _sync_config.get("library_repo", "")
+    if not _sync_repo:
+        st.sidebar.error("Set repository URL in Export → Sync Settings first.")
+    else:
+        _lib_str = str(LIB)
+        try:
+            # ensure git
+            _gi = LIB / ".gitignore"
+            if not _gi.exists():
+                _gi.write_text(
+                    "*.token\n*.key\n.env\n__pycache__/\n"
+                    ".DS_Store\nThumbs.db\nlibrary.bib\n",
+                    encoding="utf-8",
+                )
+            if not (LIB / ".git").exists():
+                subprocess.run(["git", "init"], cwd=_lib_str, check=True, capture_output=True)
+                subprocess.run(["git", "branch", "-M", "main"], cwd=_lib_str, check=True, capture_output=True)
+            _r = subprocess.run(["git", "remote", "get-url", "origin"], cwd=_lib_str, capture_output=True, text=True)
+            if _r.returncode != 0:
+                subprocess.run(["git", "remote", "add", "origin", _sync_repo], cwd=_lib_str, check=True, capture_output=True)
+            elif _r.stdout.strip() != _sync_repo:
+                subprocess.run(["git", "remote", "set-url", "origin", _sync_repo], cwd=_lib_str, check=True, capture_output=True)
+
+            # commit local
+            subprocess.run(["git", "add", "-A"], cwd=_lib_str, check=True, capture_output=True)
+            _has = subprocess.run(["git", "rev-parse", "HEAD"], cwd=_lib_str, capture_output=True).returncode == 0
+            if _has:
+                if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=_lib_str, capture_output=True).returncode != 0:
+                    subprocess.run(["git", "commit", "-m", "litman: local snapshot"], cwd=_lib_str, check=True, capture_output=True)
+            else:
+                subprocess.run(["git", "commit", "-m", "litman: initial library"], cwd=_lib_str, check=True, capture_output=True)
+                _has = True
+
+            # pull
+            _fetch = subprocess.run(["git", "fetch", "origin", "main"], cwd=_lib_str, capture_output=True, text=True)
+            _remote_exists = _fetch.returncode == 0 and subprocess.run(
+                ["git", "rev-parse", "--verify", "origin/main"], cwd=_lib_str, capture_output=True,
+            ).returncode == 0
+
+            _pull_ok = True
+            if _remote_exists:
+                _diff = subprocess.run(
+                    ["git", "diff", "--name-status", "HEAD", "origin/main"],
+                    cwd=_lib_str, capture_output=True, text=True,
+                )
+                _del_lines = [l for l in _diff.stdout.strip().splitlines() if l.startswith("D")]
+                if len(_del_lines) > 10:
+                    st.session_state["quick_sync_warn"] = len(_del_lines)
+                    _pull_ok = False
+                else:
+                    _merge = subprocess.run(
+                        ["git", "merge", "origin/main", "--allow-unrelated-histories",
+                         "-m", "litman: pull from shared library"],
+                        cwd=_lib_str, capture_output=True, text=True,
+                    )
+                    if _merge.returncode != 0:
+                        st.sidebar.error(f"Merge failed: {_merge.stderr[:120]}")
+                        _pull_ok = False
+
+            # push
+            if _pull_ok:
+                subprocess.run(["git", "add", "-A"], cwd=_lib_str, check=True, capture_output=True)
+                if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=_lib_str, capture_output=True).returncode != 0:
+                    subprocess.run(["git", "commit", "-m", "litman: sync library"], cwd=_lib_str, check=True, capture_output=True)
+                _push = subprocess.run(["git", "push", "-u", "origin", "main"], cwd=_lib_str, capture_output=True, text=True)
+                if _push.returncode == 0:
+                    st.sidebar.success("Sync complete!")
+                    st.cache_data.clear()
+                elif "rejected" in _push.stderr:
+                    st.sidebar.error("Push rejected — try again.")
+                else:
+                    st.sidebar.error(f"Push failed: {_push.stderr[:120]}")
+        except subprocess.CalledProcessError as e:
+            st.sidebar.error(f"Git error: {(e.stderr.decode() if e.stderr else str(e))[:120]}")
+
+if st.session_state.get("quick_sync_warn"):
+    _n = st.session_state["quick_sync_warn"]
+    st.sidebar.warning(f"{_n} files will be deleted. Use Export → Sync Settings for detailed Pull/Push.")
+    if st.sidebar.button("Dismiss", key="sync_warn_dismiss"):
+        st.session_state.pop("quick_sync_warn", None)
+        st.rerun()
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -825,9 +918,9 @@ elif page == "Export":
             with st.expander("Preview"):
                 st.code(bib_text, language="bibtex")
 
-    # ── Library Sync ────────────────────────────────────────────────────
+    # ── Sync Settings ────────────────────────────────────────────────────
     st.markdown("---")
-    st.subheader("Library Sync")
+    st.subheader("Sync Settings")
 
     config = load_config(LIB)
     library_repo = config.get("library_repo", "")
