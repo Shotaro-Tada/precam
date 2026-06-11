@@ -17,11 +17,16 @@ def _paper_text(paper: Paper) -> str:
     return " ".join(parts).lower()
 
 
-def search_papers(papers: list[Paper], query: str) -> list[Paper]:
+def search_papers(papers: list[Paper], query: str, scope: str = "all") -> list[Paper]:
     tokens = query.lower().split()
     results = []
     for paper in papers:
-        text = _paper_text(paper)
+        if scope == "title":
+            text = paper.title.lower()
+        elif scope == "authors":
+            text = " ".join(a.full_name() for a in paper.authors).lower()
+        else:
+            text = _paper_text(paper)
         if all(t in text for t in tokens):
             results.append(paper)
     return results

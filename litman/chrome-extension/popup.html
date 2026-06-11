@@ -17,6 +17,47 @@
       <input type="text" id="manual-doi" placeholder="10.1021/acs.xxx">
     </label>
     <button id="manual-fetch" class="btn btn-primary btn-sm">Fetch</button>
+    <div class="separator"></div>
+    <p style="font-size:12px;color:#888;">Or save as a web page:</p>
+    <button id="save-webpage" class="btn btn-primary" style="width:100%;">Save as Web Page</button>
+  </div>
+
+  <div id="webpage-info" hidden>
+    <div class="field">
+      <label>Title</label>
+      <input type="text" id="wp-title">
+    </div>
+    <div class="field">
+      <label>Site</label>
+      <input type="text" id="wp-site">
+    </div>
+    <div class="field">
+      <label>URL</label>
+      <span id="wp-url" style="font-size:11px;color:#666;"></span>
+    </div>
+
+    <div class="separator"></div>
+
+    <div class="field">
+      <label>Library</label>
+      <div class="lib-row">
+        <select id="wp-library-select"></select>
+        <button id="wp-sync-litman" class="btn btn-sm" title="Sync from litman">Sync</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Folder</label>
+      <div id="wp-folder-container">
+        <input type="text" id="wp-folder-input" list="wp-folder-list" placeholder="Type or select folder...">
+        <datalist id="wp-folder-list"></datalist>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="wp-save-litman" class="btn btn-primary">Add to litman</button>
+    </div>
+
+    <div id="wp-msg" class="status" hidden></div>
   </div>
 
   <div id="paper-info" hidden>

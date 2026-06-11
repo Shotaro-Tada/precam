@@ -17,6 +17,7 @@ class Author(BaseModel):
 
 class Paper(BaseModel):
     id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
+    item_type: str = "paper"  # "paper" or "webpage"
     title: str
     authors: list[Author] = []
     year: Optional[int] = None
@@ -30,6 +31,7 @@ class Paper(BaseModel):
     publisher: Optional[str] = None
     abstract: Optional[str] = None
     url: str
+    site_name: Optional[str] = None  # for webpages: og:site_name or domain
     tags: list[str] = []
     notes: str = ""
     added_at: str = Field(

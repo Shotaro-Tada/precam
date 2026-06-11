@@ -159,9 +159,52 @@ def get_prefix(library_dir: Path | None = None) -> str:
     return load_config(library_dir).get("prefix", _PREFIX)
 
 
+# ── API credentials (PDF retrieval) ───────────────────────────────────────
+
+_CREDENTIAL_KEYS = {"elsevier_api_key", "elsevier_insttoken", "unpaywall_email"}
+
+
+def get_config_value(
+    key: str, library_dir: Path | None = None, env: str | None = None
+) -> str | None:
+    """Resolve a setting: environment variable first, then config.json."""
+    if env:
+        val = os.environ.get(env)
+        if val:
+            return val
+    return load_config(library_dir).get(key)
+
+
+def set_config_value(key: str, value: str, library_dir: Path | None = None) -> None:
+    config = load_config(library_dir)
+    config[key] = value
+    save_config(config, library_dir)
+
+
 def member_root(member: str, library_dir: Path | None = None) -> str:
     prefix = get_prefix(library_dir)
     return f"{prefix}-{member}"
+
+
+def get_custom_folders(library_dir: Path | None = None) -> list[str]:
+    return load_config(library_dir).get("folders", [])
+
+
+def add_custom_folder(folder_path: str, library_dir: Path | None = None) -> None:
+    config = load_config(library_dir)
+    folders = config.get("folders", [])
+    if folder_path not in folders:
+        folders.append(folder_path)
+        folders.sort()
+        config["folders"] = folders
+        save_config(config, library_dir)
+
+
+def remove_custom_folder(folder_path: str, library_dir: Path | None = None) -> None:
+    config = load_config(library_dir)
+    folders = config.get("folders", [])
+    config["folders"] = [f for f in folders if f != folder_path and not f.startswith(folder_path + "/")]
+    save_config(config, library_dir)
 
 
 def add_member(name: str, library_dir: Path | None = None) -> None:

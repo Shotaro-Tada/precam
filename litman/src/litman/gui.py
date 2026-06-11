@@ -28,6 +28,9 @@ from litman.store import (
     delete_folder,
     delete_paper,
     find_duplicate,
+    get_custom_folders,
+    add_custom_folder,
+    remove_custom_folder,
     get_custom_styles,
     get_library_dir,
     get_members,
@@ -143,6 +146,8 @@ def load_library() -> list[Paper]:
 
 def _collect_folders(papers: list[Paper]) -> dict[str, int]:
     counts: dict[str, int] = {}
+    for f in get_custom_folders():
+        counts.setdefault(f, 0)
     for p in papers:
         for t in p.tags:
             if t.startswith("folder:"):
@@ -290,6 +295,13 @@ if selected_member != _last_member or selected_folder != _last_folder:
 
 st.sidebar.markdown("---")
 search_query = st.sidebar.text_input("Search", placeholder="keyword...")
+search_scope = st.sidebar.radio(
+    "Search in",
+    ["All fields", "Title only", "Authors"],
+    horizontal=True,
+    key="search_scope",
+    label_visibility="collapsed",
+)
 
 selected_tags = st.sidebar.multiselect("Tags", all_non_folder_tags) if all_non_folder_tags else []
 
@@ -317,7 +329,13 @@ st.sidebar.caption("Need a different style? Contact the admin.")
 # ── Manage (bottom of sidebar) ───────────────────────────────────────────
 
 st.sidebar.markdown("---")
-st.sidebar.markdown(f"**{len(all_papers)}** papers · **{len(members)}** members")
+_n_papers = sum(1 for p in all_papers if p.item_type != "webpage")
+_n_web = sum(1 for p in all_papers if p.item_type == "webpage")
+_stat_parts = [f"**{_n_papers}** papers"]
+if _n_web:
+    _stat_parts.append(f"**{_n_web}** web pages")
+_stat_parts.append(f"**{len(members)}** members")
+st.sidebar.markdown(" · ".join(_stat_parts))
 
 with st.sidebar.expander("Manage Folders / Members"):
     tab_f, tab_m = st.tabs(["Folders", "Members"])
@@ -329,8 +347,10 @@ with st.sidebar.expander("Manage Folders / Members"):
         if st.button("Create", key="mng_create_folder"):
             if new_folder.strip():
                 full = new_folder.strip() if parent_choice == "(root)" else f"{parent_choice}/{new_folder.strip()}"
+                add_custom_folder(full)
+                st.cache_data.clear()
                 st.success(f"Created: {full}")
-                st.caption("Assign papers to populate.")
+                st.rerun()
             else:
                 st.warning("Enter a name.")
 
@@ -347,6 +367,7 @@ with st.sidebar.expander("Manage Folders / Members"):
                 c1, c2 = st.columns(2)
                 if c1.button("Yes", key="mng_yes_del"):
                     delete_folder(target, LIB)
+                    remove_custom_folder(target)
                     st.session_state.pop("confirm_del_folder", None)
                     st.cache_data.clear()
                     st.rerun()
@@ -380,7 +401,8 @@ def get_filtered_papers() -> list[Paper]:
     if selected_folder and selected_folder != "ALL":
         papers = filter_by_folder(papers, selected_folder)
     if search_query:
-        papers = search_papers(papers, search_query)
+        _scope_map = {"All fields": "all", "Title only": "title", "Authors": "authors"}
+        papers = search_papers(papers, search_query, scope=_scope_map.get(search_scope, "all"))
     if selected_tags:
         papers = filter_papers(papers, tags=selected_tags)
     if year_range:
@@ -517,10 +539,14 @@ if page == "Library":
         with col_list:
             with st.container(height=700):
                 for p in papers:
-                    first_author = p.authors[0].family if p.authors else "?"
-                    if len(p.authors) > 1:
-                        first_author += " et al."
-                    label = f"**{p.title[:80]}**  \n{first_author} · {p.year or '?'} · {p.journal or ''}"
+                    if p.item_type == "webpage":
+                        _site = p.site_name or (p.url.split("/")[2] if p.url and "/" in p.url else "Web")
+                        label = f"🌐 **{p.title[:80]}**  \n{_site}"
+                    else:
+                        first_author = p.authors[0].family if p.authors else "?"
+                        if len(p.authors) > 1:
+                            first_author += " et al."
+                        label = f"**{p.title[:80]}**  \n{first_author} · {p.year or '?'} · {p.journal or ''}"
 
                     is_sel = st.session_state.get("selected_paper") == p.id
                     if st.button(
@@ -542,20 +568,33 @@ if page == "Library":
 
                 if paper:
                     st.subheader(paper.title)
-                    st.markdown(
-                        f"**Authors:** {', '.join(a.full_name() for a in paper.authors)}"
-                    )
 
-                    _j_display = paper.journal or "N/A"
-                    if paper.journal_abbrev and paper.journal_abbrev != paper.journal:
-                        _j_display += f" ({paper.journal_abbrev})"
-                    st.markdown(
-                        f"**Year:** {paper.year or 'N/A'} &nbsp;&nbsp; "
-                        f"**Journal:** {_j_display}  \n"
-                        f"**DOI:** {paper.doi or 'N/A'}"
-                    )
+                    if paper.item_type == "webpage":
+                        _site = paper.site_name or ""
+                        st.markdown(
+                            f"🌐 **Web Page**"
+                            + (f" &nbsp;&nbsp; **Site:** {_site}" if _site else "")
+                        )
+                        if paper.url:
+                            st.markdown(
+                                f'<a href="{paper.url}" target="_blank" rel="noopener noreferrer">{paper.url}</a>',
+                                unsafe_allow_html=True,
+                            )
+                    else:
+                        st.markdown(
+                            f"**Authors:** {', '.join(a.full_name() for a in paper.authors)}"
+                        )
 
-                    if not paper.doi and paper.title and paper.title != "Untitled":
+                        _j_display = paper.journal or "N/A"
+                        if paper.journal_abbrev and paper.journal_abbrev != paper.journal:
+                            _j_display += f" ({paper.journal_abbrev})"
+                        st.markdown(
+                            f"**Year:** {paper.year or 'N/A'} &nbsp;&nbsp; "
+                            f"**Journal:** {_j_display}  \n"
+                            f"**DOI:** {paper.doi or 'N/A'}"
+                        )
+
+                    if not paper.doi and paper.title and paper.title != "Untitled" and paper.item_type != "webpage":
                         if st.button("Find DOI from title", key=f"find_doi_{paper.id}"):
                             st.session_state[f"doi_search_{paper.id}"] = True
                         if st.session_state.get(f"doi_search_{paper.id}"):
@@ -655,53 +694,54 @@ if page == "Library":
                             unsafe_allow_html=True,
                         )
 
-                    # ── Citation ───────────────────────────────────────
-                    st.markdown(f"**Refer this paper** — {sidebar_cite_style}")
-                    _is_custom = sidebar_cite_style in custom_style_names
-                    _custom_def = next((s for s in custom_styles if s["name"] == sidebar_cite_style), None) if _is_custom else None
+                    # ── Citation (papers only) ─────────────────────────
+                    if paper.item_type != "webpage":
+                        st.markdown(f"**Refer this paper** — {sidebar_cite_style}")
+                        _is_custom = sidebar_cite_style in custom_style_names
+                        _custom_def = next((s for s in custom_styles if s["name"] == sidebar_cite_style), None) if _is_custom else None
 
-                    use_abbrev = st.checkbox(
-                        "Journal abbreviation",
-                        value=True,
-                        key=f"abbrev_{paper.id}",
-                        disabled=not paper.journal_abbrev,
-                        help=paper.journal_abbrev or "Run 'Fix information from DOI' to fetch abbreviation",
-                    )
-                    cite_col1, cite_col2 = st.columns(2)
-                    _copied = False
-                    _abbr = use_abbrev and bool(paper.journal_abbrev)
-                    with cite_col1:
-                        if st.button("Copy (with DOI)", key=f"ref_doi_{paper.id}", use_container_width=True):
-                            if _is_custom and _custom_def:
-                                cite_html = render_custom_style_html(paper, _custom_def, with_doi=True, abbrev=_abbr)
-                                cite_plain = render_custom_style(paper, _custom_def, with_doi=True, abbrev=_abbr)
-                            else:
-                                cite_html = format_citation_html(paper, sidebar_cite_style, with_doi=True, abbrev=_abbr)
-                                cite_plain = format_citation(paper, sidebar_cite_style, with_doi=True, abbrev=_abbr)
-                            _copy_to_clipboard(cite_html, cite_plain)
-                            st.session_state[f"cite_result_{paper.id}"] = cite_html
-                            _copied = True
-                    with cite_col2:
-                        if st.button("Copy (w/o DOI)", key=f"ref_nodoi_{paper.id}", use_container_width=True):
-                            if _is_custom and _custom_def:
-                                cite_html = render_custom_style_html(paper, _custom_def, with_doi=False, abbrev=_abbr)
-                                cite_plain = render_custom_style(paper, _custom_def, with_doi=False, abbrev=_abbr)
-                            else:
-                                cite_html = format_citation_html(paper, sidebar_cite_style, with_doi=False, abbrev=_abbr)
-                                cite_plain = format_citation(paper, sidebar_cite_style, with_doi=False, abbrev=_abbr)
-                            _copy_to_clipboard(cite_html, cite_plain)
-                            st.session_state[f"cite_result_{paper.id}"] = cite_html
-                            _copied = True
-
-                    if _copied:
-                        st.success("Copied to clipboard!")
-                    if st.session_state.get(f"cite_result_{paper.id}"):
-                        st.markdown(
-                            f'<div style="background:#1e1e1e;padding:12px;border-radius:6px;'
-                            f'margin:8px 0;font-size:14px;line-height:1.6;">'
-                            f'{st.session_state[f"cite_result_{paper.id}"]}</div>',
-                            unsafe_allow_html=True,
+                        use_abbrev = st.checkbox(
+                            "Journal abbreviation",
+                            value=True,
+                            key=f"abbrev_{paper.id}",
+                            disabled=not paper.journal_abbrev,
+                            help=paper.journal_abbrev or "Run 'Fix information from DOI' to fetch abbreviation",
                         )
+                        cite_col1, cite_col2 = st.columns(2)
+                        _copied = False
+                        _abbr = use_abbrev and bool(paper.journal_abbrev)
+                        with cite_col1:
+                            if st.button("Copy (with DOI)", key=f"ref_doi_{paper.id}", use_container_width=True):
+                                if _is_custom and _custom_def:
+                                    cite_html = render_custom_style_html(paper, _custom_def, with_doi=True, abbrev=_abbr)
+                                    cite_plain = render_custom_style(paper, _custom_def, with_doi=True, abbrev=_abbr)
+                                else:
+                                    cite_html = format_citation_html(paper, sidebar_cite_style, with_doi=True, abbrev=_abbr)
+                                    cite_plain = format_citation(paper, sidebar_cite_style, with_doi=True, abbrev=_abbr)
+                                _copy_to_clipboard(cite_html, cite_plain)
+                                st.session_state[f"cite_result_{paper.id}"] = cite_html
+                                _copied = True
+                        with cite_col2:
+                            if st.button("Copy (w/o DOI)", key=f"ref_nodoi_{paper.id}", use_container_width=True):
+                                if _is_custom and _custom_def:
+                                    cite_html = render_custom_style_html(paper, _custom_def, with_doi=False, abbrev=_abbr)
+                                    cite_plain = render_custom_style(paper, _custom_def, with_doi=False, abbrev=_abbr)
+                                else:
+                                    cite_html = format_citation_html(paper, sidebar_cite_style, with_doi=False, abbrev=_abbr)
+                                    cite_plain = format_citation(paper, sidebar_cite_style, with_doi=False, abbrev=_abbr)
+                                _copy_to_clipboard(cite_html, cite_plain)
+                                st.session_state[f"cite_result_{paper.id}"] = cite_html
+                                _copied = True
+
+                        if _copied:
+                            st.success("Copied to clipboard!")
+                        if st.session_state.get(f"cite_result_{paper.id}"):
+                            st.markdown(
+                                f'<div style="background:#1e1e1e;padding:12px;border-radius:6px;'
+                                f'margin:8px 0;font-size:14px;line-height:1.6;">'
+                                f'{st.session_state[f"cite_result_{paper.id}"]}</div>',
+                                unsafe_allow_html=True,
+                            )
 
                     # ── Edit ──────────────────────────────────────────
                     st.markdown("---")
@@ -755,83 +795,132 @@ if page == "Library":
 elif page == "Add Paper":
     st.header("Add Paper")
 
-    url = st.text_input("Paper URL (DOI link, arXiv, or publisher page)")
+    _add_tab_paper, _add_tab_web = st.tabs(["Paper (DOI/URL)", "Web Page"])
 
-    # Member selector with inline add
-    add_col1, add_col2 = st.columns([4, 1])
-    with add_col1:
-        member_choice = st.selectbox("Member", members, key="add_member") if members else None
-    with add_col2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("＋", key="add_page_new_mem", help="Add new member"):
-            st.session_state["show_add_member_addpage"] = True
+    with _add_tab_web:
+        wp_url = st.text_input("Web page URL", key="wp_url")
+        wp_title = st.text_input("Title", key="wp_title")
+        wp_site = st.text_input("Site name (optional)", key="wp_site", placeholder="e.g. Wikipedia, GitHub")
+        wp_desc = st.text_area("Description / Notes (optional)", key="wp_desc", height=80)
 
-    if st.session_state.get("show_add_member_addpage"):
-        nm = st.text_input("New member name", key="add_page_mem_name")
-        nc1, nc2 = st.columns(2)
-        if nc1.button("Add", key="add_page_confirm_mem"):
-            if nm.strip():
-                add_member(nm.strip(), LIB)
-                st.session_state.pop("show_add_member_addpage", None)
-                st.cache_data.clear()
-                st.rerun()
-        if nc2.button("Cancel", key="add_page_cancel_mem"):
-            st.session_state.pop("show_add_member_addpage", None)
-            st.rerun()
+        wp_mem = st.selectbox("Member", members, key="wp_member") if members else None
+        wp_tags_input = st.text_input("Tags (comma-separated)", key="wp_tags", placeholder="reference, tutorial")
 
-    tags_input = st.text_input("Tags (comma-separated)", placeholder="catalyst, DFT, review")
+        wp_folder_opts = ["None"]
+        if wp_mem:
+            _wp_root = member_root(wp_mem, LIB)
+            wp_folder_opts.append(_wp_root)
+            for fp in sorted(folder_counts.keys(), reverse=True):
+                if fp.startswith(_wp_root + "/"):
+                    wp_folder_opts.append(fp)
 
-    # Folder selector filtered by member
-    folder_opts_add = ["None"]
-    if member_choice:
-        root = member_root(member_choice, LIB)
-        folder_opts_add.append(root)
-        for fp in sorted(folder_counts.keys(), reverse=True):
-            if fp.startswith(root + "/"):
-                folder_opts_add.append(fp)
+        wp_folder = st.selectbox(
+            "Assign to folder",
+            wp_folder_opts,
+            format_func=lambda fp: fp if fp == "None" else (fp.split("/")[-1] if "/" in fp else fp),
+            key="wp_folder",
+        )
 
-    def _add_folder_label(fp: str) -> str:
-        if fp == "None":
-            return "None"
-        parts = fp.split("/")
-        if len(parts) <= 1:
-            return fp
-        indent = "　" * (len(parts) - 1) + "└ "
-        return f"{indent}{parts[-1]}"
+        if st.button("Add Web Page", type="primary", key="wp_add_btn", disabled=not wp_url or not wp_title):
+            dup = find_duplicate(None, wp_url, LIB)
+            wp_tags = [t.strip() for t in wp_tags_input.split(",") if t.strip()] if wp_tags_input else []
+            if wp_folder and wp_folder != "None":
+                wp_tags.append(f"folder:{wp_folder}")
 
-    assign_folder = st.selectbox(
-        "Assign to folder",
-        folder_opts_add,
-        format_func=_add_folder_label,
-        key="add_folder",
-    )
-
-    if st.button("Add", type="primary", disabled=not url):
-        with st.spinner("Fetching metadata..."):
-            try:
-                paper = fetch_metadata(url)
-            except Exception as e:
-                st.error(f"Failed to fetch metadata: {e}")
-                st.stop()
-
-            dup = find_duplicate(paper.doi, url, LIB)
-
-            if tags_input:
-                paper.tags = [t.strip() for t in tags_input.split(",") if t.strip()]
-
-            if assign_folder and assign_folder != "None":
-                paper.tags.append(f"folder:{assign_folder}")
-
-            save_paper(paper, LIB)
+            wp_paper = Paper(
+                item_type="webpage",
+                title=wp_title.strip(),
+                url=wp_url.strip(),
+                site_name=wp_site.strip() or None,
+                abstract=wp_desc.strip() or None,
+                tags=wp_tags,
+            )
+            save_paper(wp_paper, LIB)
             st.cache_data.clear()
+            st.success(f"Added: **{wp_paper.title}**")
+            if dup:
+                st.info(f"Note: duplicate exists — [{dup.id}] {dup.title[:60]}")
+            st.markdown(f"- URL: {wp_paper.url}")
+            st.markdown(f"- ID: `{wp_paper.id}`")
 
-        st.success(f"Added: **{paper.title}**")
-        if dup:
-            st.info(f"Note: duplicate exists — [{dup.id}] {dup.title[:60]}")
-        st.markdown(f"- Authors: {', '.join(a.full_name() for a in paper.authors)}")
-        st.markdown(f"- Year: {paper.year}")
-        st.markdown(f"- DOI: {paper.doi or 'N/A'}")
-        st.markdown(f"- ID: `{paper.id}`")
+    with _add_tab_paper:
+        url = st.text_input("Paper URL (DOI link, arXiv, or publisher page)")
+
+        # Member selector with inline add
+        add_col1, add_col2 = st.columns([4, 1])
+        with add_col1:
+            member_choice = st.selectbox("Member", members, key="add_member") if members else None
+        with add_col2:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("＋", key="add_page_new_mem", help="Add new member"):
+                st.session_state["show_add_member_addpage"] = True
+
+        if st.session_state.get("show_add_member_addpage"):
+            nm = st.text_input("New member name", key="add_page_mem_name")
+            nc1, nc2 = st.columns(2)
+            if nc1.button("Add", key="add_page_confirm_mem"):
+                if nm.strip():
+                    add_member(nm.strip(), LIB)
+                    st.session_state.pop("show_add_member_addpage", None)
+                    st.cache_data.clear()
+                    st.rerun()
+            if nc2.button("Cancel", key="add_page_cancel_mem"):
+                st.session_state.pop("show_add_member_addpage", None)
+                st.rerun()
+
+        tags_input = st.text_input("Tags (comma-separated)", placeholder="catalyst, DFT, review")
+
+        # Folder selector filtered by member
+        folder_opts_add = ["None"]
+        if member_choice:
+            root = member_root(member_choice, LIB)
+            folder_opts_add.append(root)
+            for fp in sorted(folder_counts.keys(), reverse=True):
+                if fp.startswith(root + "/"):
+                    folder_opts_add.append(fp)
+
+        def _add_folder_label(fp: str) -> str:
+            if fp == "None":
+                return "None"
+            parts = fp.split("/")
+            if len(parts) <= 1:
+                return fp
+            indent = "　" * (len(parts) - 1) + "└ "
+            return f"{indent}{parts[-1]}"
+
+        assign_folder = st.selectbox(
+            "Assign to folder",
+            folder_opts_add,
+            format_func=_add_folder_label,
+            key="add_folder",
+        )
+
+        if st.button("Add", type="primary", disabled=not url):
+            with st.spinner("Fetching metadata..."):
+                try:
+                    paper = fetch_metadata(url)
+                except Exception as e:
+                    st.error(f"Failed to fetch metadata: {e}")
+                    st.stop()
+
+                dup = find_duplicate(paper.doi, url, LIB)
+
+                if tags_input:
+                    paper.tags = [t.strip() for t in tags_input.split(",") if t.strip()]
+
+                if assign_folder and assign_folder != "None":
+                    paper.tags.append(f"folder:{assign_folder}")
+
+                save_paper(paper, LIB)
+                st.cache_data.clear()
+
+            st.success(f"Added: **{paper.title}**")
+            if dup:
+                st.info(f"Note: duplicate exists — [{dup.id}] {dup.title[:60]}")
+            st.markdown(f"- Authors: {', '.join(a.full_name() for a in paper.authors)}")
+            st.markdown(f"- Year: {paper.year}")
+            st.markdown(f"- DOI: {paper.doi or 'N/A'}")
+            st.markdown(f"- ID: `{paper.id}`")
 
 
 # ══════════════════════════════════════════════════════════════════════════

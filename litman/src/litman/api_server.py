@@ -4,7 +4,7 @@ import json
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from .models import Paper
-from .store import get_members, member_root, load_all_papers, save_paper, find_duplicate
+from .store import get_members, member_root, load_all_papers, save_paper, find_duplicate, get_custom_folders
 
 API_PORT = 51780
 
@@ -14,12 +14,16 @@ _started = False
 def _collect_library_info() -> dict:
     members = get_members()
     papers = load_all_papers()
+    custom = get_custom_folders()
 
     lib_data: dict[str, list[str]] = {}
     for m in members:
         root = member_root(m)
         folder_prefix = f"folder:{root}/"
         folders: set[str] = set()
+        for f in custom:
+            if f.startswith(root + "/"):
+                folders.add(f[len(root) + 1:])
         for p in papers:
             for tag in p.tags:
                 if tag.startswith(folder_prefix):
@@ -48,14 +52,16 @@ class _Handler(BaseHTTPRequestHandler):
             self.end_headers()
 
     def do_POST(self):
-        if self.path == "/api/papers":
+        if self.path in ("/api/papers", "/api/webpages"):
             length = int(self.headers.get("Content-Length", 0))
             raw = self.rfile.read(length)
             try:
                 data = json.loads(raw.decode("utf-8"))
+                if self.path == "/api/webpages":
+                    data.setdefault("item_type", "webpage")
                 doi = data.get("doi")
                 url = data.get("url", "")
-                dup = find_duplicate(doi, url) if doi else None
+                dup = find_duplicate(doi, url)
                 if dup:
                     self._send_json(409, {"error": "duplicate", "id": dup.id, "title": dup.title})
                     return

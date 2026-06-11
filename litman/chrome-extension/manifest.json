@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Save to litman",
-  "version": "1.0.0",
-  "description": "Save paper metadata and PDF from journal pages to litman",
+  "version": "1.1.0",
+  "description": "Save paper metadata, PDF (incl. ScienceDirect), and web pages to litman",
   "permissions": ["activeTab", "downloads", "storage"],
   "host_permissions": ["https://api.crossref.org/*", "http://localhost:51780/*"],
   "action": {

@@ -14,16 +14,26 @@ from .bibtex import export_library_bib, generate_bibtex
 from .fetchers import fetch_metadata
 from .importer import bibtex_to_papers
 from .models import Paper
+from .pdf import PdfDownloadError, download_pdf, safe_filename
 from .zotero_sync import sync_collections
 from .search import filter_papers, search_papers
 from .store import (
     delete_paper,
     find_duplicate,
+    get_config_value,
     get_library_dir,
     load_all_papers,
     load_paper,
     save_paper,
+    set_config_value,
 )
+
+_CONFIG_ENV = {
+    "elsevier_api_key": "ELSEVIER_API_KEY",
+    "elsevier_insttoken": "ELSEVIER_INSTTOKEN",
+    "wiley_tdm_token": "WILEY_TDM_TOKEN",
+    "unpaywall_email": "UNPAYWALL_EMAIL",
+}
 
 
 @click.group()
@@ -215,6 +225,61 @@ def bib(ctx, paper_id):
         raise SystemExit(1)
 
     click.echo(generate_bibtex(paper))
+
+
+@cli.command("set-config")
+@click.argument("key", type=click.Choice(sorted(_CONFIG_ENV.keys())))
+@click.argument("value")
+@click.pass_context
+def set_config(ctx, key, value):
+    """Store an API credential (elsevier_api_key / elsevier_insttoken / wiley_tdm_token / unpaywall_email)."""
+    set_config_value(key, value, _lib(ctx))
+    shown = value if key == "unpaywall_email" else value[:4] + "…" + value[-2:]
+    click.echo(f"Set {key} = {shown}")
+
+
+@cli.command("fetch-pdf")
+@click.argument("target")
+@click.option("--output", "-o", type=click.Path(), default=None,
+              help="Output file or directory (default: ./<Family-Year-Title>.pdf)")
+@click.option("--api-key", default=None, help="Elsevier API key (overrides config/env)")
+@click.option("--insttoken", default=None, help="Elsevier institutional token")
+@click.pass_context
+def fetch_pdf(ctx, target, output, api_key, insttoken):
+    """Download a PDF by DOI or by paper id (Elsevier API, with Unpaywall OA fallback)."""
+    lib = _lib(ctx)
+
+    paper = None
+    if "/" in target and target.lower().startswith("10."):
+        doi = target
+    else:
+        try:
+            paper = load_paper(target, lib)
+            doi = paper.doi
+        except FileNotFoundError:
+            doi = target  # treat as a bare DOI
+    if not doi:
+        click.echo("No DOI to fetch (paper has no DOI).", err=True)
+        raise SystemExit(1)
+
+    api_key = api_key or get_config_value("elsevier_api_key", lib, _CONFIG_ENV["elsevier_api_key"])
+    insttoken = insttoken or get_config_value("elsevier_insttoken", lib, _CONFIG_ENV["elsevier_insttoken"])
+    wiley_token = get_config_value("wiley_tdm_token", lib, _CONFIG_ENV["wiley_tdm_token"])
+    email = get_config_value("unpaywall_email", lib, _CONFIG_ENV["unpaywall_email"])
+
+    dest = Path(output) if output else Path.cwd() / safe_filename(paper, doi)
+    click.echo(f"Fetching PDF for {doi} ...")
+    try:
+        path, route = download_pdf(
+            doi, dest, paper=paper,
+            elsevier_api_key=api_key, elsevier_insttoken=insttoken,
+            wiley_tdm_token=wiley_token,
+            unpaywall_email=email,
+        )
+    except PdfDownloadError as e:
+        click.echo(f"Failed: {e}", err=True)
+        raise SystemExit(1)
+    click.echo(f"Saved ({route}): {path}")
 
 
 @cli.command("import")
