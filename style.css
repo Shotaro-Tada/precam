@@ -325,6 +325,44 @@ details.abs summary:hover{
   display: block;
 }
 
+/* ===== Home: update ticker ===== */
+.update-ticker{
+  overflow: hidden;
+  border-top: 1px solid #e1e4e8;
+  border-bottom: 1px solid #e1e4e8;
+  background: #f6f8fa;
+  padding: 8px 0;
+  margin: 6px 0 26px;
+}
+
+.update-ticker-track{
+  display: inline-block;
+  white-space: nowrap;
+  padding-left: 100%;
+  animation: ticker-scroll 20s linear infinite;
+}
+
+.update-ticker-track a{
+  font-size: 0.95rem;
+  text-decoration: none;
+}
+
+.update-ticker:hover .update-ticker-track{
+  animation-play-state: paused;
+}
+
+@keyframes ticker-scroll{
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-100%); }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .update-ticker-track{
+    animation: none;
+    padding-left: 0;
+  }
+}
+
 /* ===== Home: Research Highlight (Hero) width control ===== */
 
 .hero-image{
