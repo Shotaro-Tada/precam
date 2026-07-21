@@ -325,42 +325,60 @@ details.abs summary:hover{
   display: block;
 }
 
-/* ===== Home: update ticker ===== */
+/* ===== Home: update ticker (vertical rotation) ===== */
 .update-ticker{
-  overflow: hidden;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
   border-top: 1px solid #e1e4e8;
   border-bottom: 1px solid #e1e4e8;
   background: #f6f8fa;
-  padding: 8px 0;
+  padding: 10px 16px;
   margin: 6px 0 26px;
 }
 
-.update-ticker-track{
-  display: inline-block;
-  white-space: nowrap;
-  padding-left: 100%;
-  animation: ticker-scroll 20s linear infinite;
+.update-ticker-label{
+  flex-shrink: 0;
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  opacity: 0.7;
+  line-height: 2em;
 }
 
-.update-ticker-track a{
+.update-ticker-viewport{
+  flex: 1;
+  height: calc(6em + 2px);    /* 3 rows of 2em + 2 separator lines */
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.update-ticker-list{
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.update-ticker-list li{
+  display: flex;
+  align-items: center;
+  height: 2em;
+  margin: 0;              /* cancel global li margin */
+}
+
+.update-ticker-list li + li{
+  border-top: 1px solid #e8eaed;
+}
+
+.update-ticker-list li a{
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.update-ticker-list a{
   font-size: 0.95rem;
   text-decoration: none;
-}
-
-.update-ticker:hover .update-ticker-track{
-  animation-play-state: paused;
-}
-
-@keyframes ticker-scroll{
-  0%   { transform: translateX(0); }
-  100% { transform: translateX(-100%); }
-}
-
-@media (prefers-reduced-motion: reduce){
-  .update-ticker-track{
-    animation: none;
-    padding-left: 0;
-  }
 }
 
 /* ===== Home: Research Highlight (Hero) width control ===== */
