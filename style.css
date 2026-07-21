@@ -351,6 +351,17 @@ section figure img {
   display: block;
 }
 
+/* Members page: group photo */
+figure.group-photo img {
+  border-radius: 12px;
+}
+
+figure.group-photo figcaption {
+  margin-top: 8px;
+  font-size: 0.92rem;
+  opacity: 0.85;
+}
+
 .muted-image {
   filter: saturate(60%);
 }
