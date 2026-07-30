@@ -79,6 +79,12 @@ a:hover{
 }
 
 /* Navigation */
+.nav{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
 .nav a{
   font-size: 13px;
   letter-spacing: 1px;
@@ -86,7 +92,7 @@ a:hover{
   text-decoration: none;
   padding-bottom: 2px;
   color: var(--muted);
-  border-bottom: 1px solid transparent;
+  border-bottom: 1px solid var(--line);
 }
 
 .nav a:hover,
