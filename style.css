@@ -669,3 +669,62 @@ figure.group-photo figcaption {
     max-height: none;
   }
 }
+/* ===== Moment ===== */
+/* One moment = one image (a single photo, or a collage flattened at the
+   asset stage). Aspect ratio is fixed upstream, never forced here.        */
+
+.moment{
+  margin-top: 56px;
+}
+
+.moment-head{
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.moment-title{
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.moment-date{
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.moment-caption{
+  margin-top: 2px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.moment-link{
+  display: block;
+  max-width: 560px;
+  margin-top: 14px;
+  text-decoration: none;
+}
+
+.moment-photo{
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.moment-link:hover .moment-photo{
+  border-color: var(--line-strong);
+}
+
+@media (max-width: 640px){
+  .moment-head{
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+}
